@@ -1,0 +1,94 @@
+const express = require("express");
+require("dotenv").config();
+
+const fetch = (...args) =>
+  import("node-fetch").then(({ default: fetch }) => fetch(...args));
+
+const router = express.Router();
+
+const VALID_CATEGORIES = [
+  "business",
+  "entertainment",
+  "general",
+  "health",
+  "science",
+  "sports",
+  "technology",
+];
+
+router.get("/news/:category", async (req, res) => {
+  const { category } = req.params;
+
+  if (!VALID_CATEGORIES.includes(category)) {
+    return res.status(400).json({ message: "Invalid category" });
+  }
+
+  try {
+    if (!process.env.GNEWS_API_KEY) {
+      console.error("GNEWS_API_KEY is not configured");
+      return res.status(500).json({ 
+        message: "API key not configured",
+        status: "error"
+      });
+    }
+
+    const url = `https://gnews.io/api/v4/top-headlines?topic=${category}&lang=en&country=in&max=10&token=${process.env.GNEWS_API_KEY}`;
+
+    console.log(`[NEWS API] Fetching news for category: ${category}`);
+    console.log(`[NEWS API] Request URL: ${url.replace(process.env.GNEWS_API_KEY, 'XXXXX')}`);
+    
+    const response = await fetch(url);
+    const data = await response.json();
+
+    console.log(`[NEWS API] Response status: ${response.status}`);
+    console.log(`[NEWS API] Response data:`, data);
+
+    if (!response.ok) {
+      console.error(`[NEWS API] Error response:`, data);
+      return res.status(response.status).json({
+        status: "error",
+        message: data.message || "Error from GNews API",
+        details: data,
+      });
+    }
+
+    if (!data.articles || !Array.isArray(data.articles)) {
+      console.error("[NEWS API] Invalid response format - no articles array found");
+      return res.status(500).json({ 
+        status: "error",
+        message: "Invalid response format from news provider",
+        details: data
+      });
+    }
+
+    console.log(`[NEWS API] Successfully fetched ${data.articles.length} articles`);
+    
+    const mappedArticles = data.articles.map((a) => ({
+      title: a.title || "No title",
+      description: a.description || "No description",
+      url: a.url || "#",
+      urlToImage: a.image || "https://via.placeholder.com/400x200?text=No+Image",
+      author: a.source?.name || "Unknown",
+      publishedAt: a.publishedAt || new Date().toISOString(),
+      source: { name: a.source?.name || "GNews" },
+      content: a.content || "",
+    }));
+
+    res.json({
+      status: "ok",
+      totalResults: data.totalArticles || data.articles.length,
+      articles: mappedArticles,
+    });
+  } catch (err) {
+    console.error("[NEWS API] Exception caught:", err.message);
+    console.error("[NEWS API] Error stack:", err.stack);
+    res.status(500).json({ 
+      status: "error",
+      message: "Server error while fetching news",
+      error: err.message,
+      details: err.toString()
+    });
+  }
+});
+
+module.exports = router;
