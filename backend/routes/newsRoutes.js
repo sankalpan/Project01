@@ -82,12 +82,21 @@ router.get("/news/:category", async (req, res) => {
   } catch (err) {
     console.error("[NEWS API] Exception caught:", err.message);
     console.error("[NEWS API] Error stack:", err.stack);
-    res.status(500).json({ 
+    
+    // Return detailed error for debugging
+    const errorDetails = {
       status: "error",
-      message: "Server error while fetching news",
-      error: err.message,
-      details: err.toString()
-    });
+      message: err.message || "Server error while fetching news",
+      type: err.constructor.name,
+      env: {
+        GNEWS_API_KEY_SET: !!process.env.GNEWS_API_KEY,
+        MONGO_URI_SET: !!process.env.MONGO_URI,
+        NODE_ENV: process.env.NODE_ENV,
+      }
+    };
+    
+    console.error("[NEWS API] Error details:", errorDetails);
+    res.status(500).json(errorDetails);
   }
 });
 
