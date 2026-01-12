@@ -26,7 +26,16 @@ app.use(express.json());
 
 // Health check endpoint
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", message: "API is running" });
+  res.json({ 
+    status: "ok", 
+    message: "API is running",
+    env_check: {
+      GNEWS_API_KEY: process.env.GNEWS_API_KEY ? "SET" : "NOT SET",
+      MONGO_URI: process.env.MONGO_URI ? "SET" : "NOT SET",
+      NODE_ENV: process.env.NODE_ENV,
+      PORT: process.env.PORT,
+    }
+  });
 });
 
 app.use("/api", authRoutes);
