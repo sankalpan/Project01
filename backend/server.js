@@ -19,12 +19,8 @@ const allowedOrigins = [
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
-app.use(
-  cors({
-    origin: allowedOrigins,
-    credentials: true,
-  })
-);
+// Temporary: allow all origins during debugging. Remove before production.
+app.use(cors());
 
 app.use(express.json());
 
