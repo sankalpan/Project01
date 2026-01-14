@@ -56,12 +56,19 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Start server immediately (don't wait for MongoDB)
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+// Connect to MongoDB in the background
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => {
-    console.log("MongoDB connected");
-    app.listen(process.env.PORT || 5000, () =>
-      console.log(`Server is running on port ${process.env.PORT || 5000}`)
-    );
+    console.log("MongoDB connected successfully");
   })
-  .catch((err) => console.error("MongoDB connection error:", err));
+  .catch((err) => {
+    console.error("MongoDB connection error:", err.message);
+    console.warn("Server running without MongoDB. Auth routes will fail but news should work.");
+  });
