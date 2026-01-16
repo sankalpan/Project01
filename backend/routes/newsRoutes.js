@@ -18,6 +18,7 @@ const VALID_CATEGORIES = [
 
 router.get("/news/:category", async (req, res) => {
   const { category } = req.params;
+  const { page = 0, limit = 10 } = req.query;
 
   if (!VALID_CATEGORIES.includes(category)) {
     return res.status(400).json({ message: "Invalid category" });
@@ -32,9 +33,11 @@ router.get("/news/:category", async (req, res) => {
       });
     }
 
-    const url = `https://gnews.io/api/v4/top-headlines?topic=${category}&lang=en&country=in&max=10&token=${process.env.GNEWS_API_KEY}`;
+    // GNews API uses offset parameter for pagination
+    const offset = page * limit;
+    const url = `https://gnews.io/api/v4/top-headlines?topic=${category}&lang=en&country=in&max=${limit}&offset=${offset}&token=${process.env.GNEWS_API_KEY}`;
 
-    console.log(`[NEWS API] Fetching news for category: ${category}`);
+    console.log(`[NEWS API] Fetching news for category: ${category}, page: ${page}, offset: ${offset}`);
     console.log(`[NEWS API] Request URL: ${url.replace(process.env.GNEWS_API_KEY, 'XXXXX')}`);
     
     const response = await fetch(url);
