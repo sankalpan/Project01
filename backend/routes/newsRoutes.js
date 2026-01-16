@@ -45,43 +45,57 @@ router.get("/news/:category", async (req, res) => {
       console.log(`[NEWS API] Using cached articles for ${category}`);
       articles = articleCache[category].data;
     } else {
-      // Fetch fresh articles from GNews API - get maximum (100)
-      const url = `https://gnews.io/api/v4/top-headlines?topic=${category}&lang=en&country=in&max=100&token=${process.env.GNEWS_API_KEY}`;
-
-      console.log(`[NEWS API] Fetching fresh news for category: ${category}`);
-      console.log(`[NEWS API] Request URL: ${url.replace(process.env.GNEWS_API_KEY, 'XXXXX')}`);
+      // Fetch fresh articles from GNews API - fetch multiple pages to get more articles
+      // GNews free tier allows max 100 per request, so fetch 5 pages = 500 articles
+      const allArticles = [];
+      const totalPages = 5; // Fetch 5 pages of 100 articles each = 500 total
       
-      const response = await fetch(url);
-      const data = await response.json();
+      console.log(`[NEWS API] Fetching fresh news for category: ${category} (${totalPages} pages)`);
 
-      console.log(`[NEWS API] Response status: ${response.status}`);
-      console.log(`[NEWS API] Total articles from API: ${data.articles?.length || 0}`);
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        try {
+          const url = `https://gnews.io/api/v4/top-headlines?topic=${category}&lang=en&country=in&max=100&sortby=publishedAt&page=${pageNum}&token=${process.env.GNEWS_API_KEY}`;
+          
+          console.log(`[NEWS API] Fetching page ${pageNum}/${totalPages}`);
+          
+          const response = await fetch(url);
+          const data = await response.json();
 
-      if (!response.ok) {
-        console.error(`[NEWS API] Error response:`, data);
-        return res.status(response.status).json({
-          status: "error",
-          message: data.message || "Error from GNews API",
-          details: data,
-        });
+          if (!response.ok) {
+            console.warn(`[NEWS API] Page ${pageNum} error: ${data.message}`);
+            continue; // Skip to next page on error
+          }
+
+          if (data.articles && Array.isArray(data.articles)) {
+            console.log(`[NEWS API] Page ${pageNum}: Got ${data.articles.length} articles`);
+            allArticles.push(...data.articles);
+          } else {
+            console.warn(`[NEWS API] Page ${pageNum}: No articles in response`);
+          }
+        } catch (pageError) {
+          console.warn(`[NEWS API] Page ${pageNum} fetch failed:`, pageError.message);
+          continue; // Continue with next page on error
+        }
       }
 
-      if (!data.articles || !Array.isArray(data.articles)) {
-        console.error("[NEWS API] Invalid response format - no articles array found");
+      if (allArticles.length === 0) {
+        console.error(`[NEWS API] No articles fetched for category: ${category}`);
         return res.status(500).json({ 
           status: "error",
-          message: "Invalid response format from news provider",
-          details: data
+          message: "No articles found for this category",
+          details: "Unable to fetch from news provider"
         });
       }
 
-      // Cache the articles
+      console.log(`[NEWS API] Total articles fetched and cached: ${allArticles.length}`);
+
+      // Cache all the articles
       articleCache[category] = {
-        data: data.articles,
-        totalResults: data.totalArticles || data.articles.length,
+        data: allArticles,
+        totalResults: allArticles.length,
         timestamp: now
       };
-      articles = data.articles;
+      articles = allArticles;
     }
 
     // Paginate the cached articles
