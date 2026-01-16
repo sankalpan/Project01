@@ -119,6 +119,10 @@ export default function News() {
                       src={article.urlToImage}
                       className="card-img-top"
                       alt="news"
+                      onError={(e) => {
+                        e.target.src = "https://via.placeholder.com/400x200?text=No+Image+Available";
+                      }}
+                      style={{ height: "200px", objectFit: "cover" }}
                     />
                     <div className="card-body d-flex flex-column">
                       <h5 className="card-title">{article.title}</h5>
