@@ -6,6 +6,10 @@ const fetch = (...args) =>
 
 const router = express.Router();
 
+// In-memory cache for articles (resets every 1 hour)
+const articleCache = {};
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
 const VALID_CATEGORIES = [
   "business",
   "entertainment",
@@ -34,44 +38,58 @@ router.get("/news/:category", async (req, res) => {
       });
     }
 
-    // GNews API - fetch more articles to support pagination
-    // We fetch a larger batch to ensure we have enough articles for pagination
-    const articlesPerFetch = Math.max(50, limit * (page + 2)); // Fetch enough for current and next pages
-    const url = `https://gnews.io/api/v4/top-headlines?topic=${category}&lang=en&country=in&max=${Math.min(articlesPerFetch, 100)}&token=${process.env.GNEWS_API_KEY}`;
+    // Check if we have cached articles for this category and they're fresh
+    const now = Date.now();
+    let articles = null;
+    if (articleCache[category] && (now - articleCache[category].timestamp) < CACHE_DURATION) {
+      console.log(`[NEWS API] Using cached articles for ${category}`);
+      articles = articleCache[category].data;
+    } else {
+      // Fetch fresh articles from GNews API - get maximum (100)
+      const url = `https://gnews.io/api/v4/top-headlines?topic=${category}&lang=en&country=in&max=100&token=${process.env.GNEWS_API_KEY}`;
 
-    console.log(`[NEWS API] Fetching news for category: ${category}, page: ${page}, limit: ${limit}`);
-    console.log(`[NEWS API] Request URL: ${url.replace(process.env.GNEWS_API_KEY, 'XXXXX')}`);
-    
-    const response = await fetch(url);
-    const data = await response.json();
+      console.log(`[NEWS API] Fetching fresh news for category: ${category}`);
+      console.log(`[NEWS API] Request URL: ${url.replace(process.env.GNEWS_API_KEY, 'XXXXX')}`);
+      
+      const response = await fetch(url);
+      const data = await response.json();
 
-    console.log(`[NEWS API] Response status: ${response.status}`);
-    console.log(`[NEWS API] Total articles from API: ${data.articles?.length || 0}`);
+      console.log(`[NEWS API] Response status: ${response.status}`);
+      console.log(`[NEWS API] Total articles from API: ${data.articles?.length || 0}`);
 
-    if (!response.ok) {
-      console.error(`[NEWS API] Error response:`, data);
-      return res.status(response.status).json({
-        status: "error",
-        message: data.message || "Error from GNews API",
-        details: data,
-      });
+      if (!response.ok) {
+        console.error(`[NEWS API] Error response:`, data);
+        return res.status(response.status).json({
+          status: "error",
+          message: data.message || "Error from GNews API",
+          details: data,
+        });
+      }
+
+      if (!data.articles || !Array.isArray(data.articles)) {
+        console.error("[NEWS API] Invalid response format - no articles array found");
+        return res.status(500).json({ 
+          status: "error",
+          message: "Invalid response format from news provider",
+          details: data
+        });
+      }
+
+      // Cache the articles
+      articleCache[category] = {
+        data: data.articles,
+        totalResults: data.totalArticles || data.articles.length,
+        timestamp: now
+      };
+      articles = data.articles;
     }
 
-    if (!data.articles || !Array.isArray(data.articles)) {
-      console.error("[NEWS API] Invalid response format - no articles array found");
-      return res.status(500).json({ 
-        status: "error",
-        message: "Invalid response format from news provider",
-        details: data
-      });
-    }
-
-    // Paginate the articles on the backend
+    // Paginate the cached articles
     const startIndex = page * limit;
     const endIndex = startIndex + limit;
-    const paginatedArticles = data.articles.slice(startIndex, endIndex);
+    const paginatedArticles = articles.slice(startIndex, endIndex);
 
-    console.log(`[NEWS API] Successfully fetched ${paginatedArticles.length} articles for page ${page}`);
+    console.log(`[NEWS API] Returning page ${page} with ${paginatedArticles.length} articles (total cached: ${articles.length})`);
     
     const mappedArticles = paginatedArticles.map((a) => ({
       title: a.title || "No title",
@@ -86,10 +104,11 @@ router.get("/news/:category", async (req, res) => {
 
     res.json({
       status: "ok",
-      totalResults: data.totalArticles || data.articles.length,
+      totalResults: articleCache[category]?.totalResults || 0,
       articles: mappedArticles,
       page: page,
       limit: limit,
+      cached: (now - articleCache[category]?.timestamp) < CACHE_DURATION,
     });
   } catch (err) {
     console.error("[NEWS API] Exception caught:", err.message);
