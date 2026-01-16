@@ -7,7 +7,7 @@ export default function Bookmarks() {
   useEffect(() => {
     const fetchBookmarks = async () => {
       // const res = await fetch('http://localhost:5000/api/bookmarks',
-        const res = await fetch(`${process.env.REACT_APP_API_URL}/bookmarks`, 
+        const res = await fetch(`${process.env.REACT_APP_API_URL}/api/bookmarks`, 
         {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -22,7 +22,7 @@ export default function Bookmarks() {
 
   const deleteBookmark = async (id) => {
     // await fetch(`http://localhost:5000/api/bookmarks/${id}`, {
-      await fetch(`${process.env.REACT_APP_API_URL}/bookmarks/${id}`, {
+      await fetch(`${process.env.REACT_APP_API_URL}/api/bookmarks/${id}`, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${token}`

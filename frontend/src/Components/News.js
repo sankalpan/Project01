@@ -4,7 +4,7 @@ import Spinner from "./Spinner";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
-  "https://mern-stack-project-backend-5osd.onrender.com/api";
+  "https://project01-r4g7.onrender.com";
 
 export default function News() {
   const { category } = useParams();
@@ -20,7 +20,7 @@ export default function News() {
       try {
         console.log("Fetching from:", `${API_URL}/news/${category}`);
 
-        const res = await fetch(`${API_URL}/news/${category}`);
+        const res = await fetch(`${API_URL}/api/news/${category}`);
         const data = await res.json();
 
         console.log("API Response:", data);
