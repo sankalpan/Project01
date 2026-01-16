@@ -57,7 +57,7 @@ export default function News() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/bookmarks`, {
+      const res = await fetch(`${API_URL}/api/bookmarks`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
