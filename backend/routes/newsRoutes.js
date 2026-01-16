@@ -18,7 +18,8 @@ const VALID_CATEGORIES = [
 
 router.get("/news/:category", async (req, res) => {
   const { category } = req.params;
-  const { page = 0, limit = 10 } = req.query;
+  const page = parseInt(req.query.page) || 0;
+  const limit = parseInt(req.query.limit) || 10;
 
   if (!VALID_CATEGORIES.includes(category)) {
     return res.status(400).json({ message: "Invalid category" });
@@ -33,18 +34,19 @@ router.get("/news/:category", async (req, res) => {
       });
     }
 
-    // GNews API uses offset parameter for pagination
-    const offset = page * limit;
-    const url = `https://gnews.io/api/v4/top-headlines?topic=${category}&lang=en&country=in&max=${limit}&offset=${offset}&token=${process.env.GNEWS_API_KEY}`;
+    // GNews API - fetch more articles to support pagination
+    // We fetch a larger batch to ensure we have enough articles for pagination
+    const articlesPerFetch = Math.max(50, limit * (page + 2)); // Fetch enough for current and next pages
+    const url = `https://gnews.io/api/v4/top-headlines?topic=${category}&lang=en&country=in&max=${Math.min(articlesPerFetch, 100)}&token=${process.env.GNEWS_API_KEY}`;
 
-    console.log(`[NEWS API] Fetching news for category: ${category}, page: ${page}, offset: ${offset}`);
+    console.log(`[NEWS API] Fetching news for category: ${category}, page: ${page}, limit: ${limit}`);
     console.log(`[NEWS API] Request URL: ${url.replace(process.env.GNEWS_API_KEY, 'XXXXX')}`);
     
     const response = await fetch(url);
     const data = await response.json();
 
     console.log(`[NEWS API] Response status: ${response.status}`);
-    console.log(`[NEWS API] Response data:`, data);
+    console.log(`[NEWS API] Total articles from API: ${data.articles?.length || 0}`);
 
     if (!response.ok) {
       console.error(`[NEWS API] Error response:`, data);
@@ -64,9 +66,14 @@ router.get("/news/:category", async (req, res) => {
       });
     }
 
-    console.log(`[NEWS API] Successfully fetched ${data.articles.length} articles`);
+    // Paginate the articles on the backend
+    const startIndex = page * limit;
+    const endIndex = startIndex + limit;
+    const paginatedArticles = data.articles.slice(startIndex, endIndex);
+
+    console.log(`[NEWS API] Successfully fetched ${paginatedArticles.length} articles for page ${page}`);
     
-    const mappedArticles = data.articles.map((a) => ({
+    const mappedArticles = paginatedArticles.map((a) => ({
       title: a.title || "No title",
       description: a.description || "No description",
       url: a.url || "#",
@@ -81,6 +88,8 @@ router.get("/news/:category", async (req, res) => {
       status: "ok",
       totalResults: data.totalArticles || data.articles.length,
       articles: mappedArticles,
+      page: page,
+      limit: limit,
     });
   } catch (err) {
     console.error("[NEWS API] Exception caught:", err.message);
