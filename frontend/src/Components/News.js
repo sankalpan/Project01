@@ -4,7 +4,7 @@ import Spinner from "./Spinner";
 
 const API_URL =
   process.env.REACT_APP_API_URL ||
-  "https://project01-r4g7.onrender.com";
+  "http://localhost:5000";
 
 export default function News() {
   const { category } = useParams();
